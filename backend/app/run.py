@@ -7,9 +7,11 @@ from app.routes.cheatsheet import router as cheatsheet_router
 from app.routes.user import router as user_router
 from app.routes.health import router as health_router
 from app.db.models import UserModel, InterviewCheatSheetModel
+from app.db import init_db
 
 def create_app():
     app = FastAPI() 
+    init_db()
 
     app.add_middleware(LoggingAndPerformanceMiddleware)
 
