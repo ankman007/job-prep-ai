@@ -3,7 +3,7 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.db.models import InterviewCheatSheetModel
-from app import get_db
+from app.db.session import get_db
 from app.routes.auth import get_current_user
 
 router = APIRouter()

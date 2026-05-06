@@ -2,8 +2,8 @@ from sqlalchemy import Integer, Column, String, ForeignKey, JSON, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
+from app.db.session import SessionLocal, Base, engine
 
-Base = declarative_base()
 class UserModel(Base):
     __tablename__ = 'users'
 

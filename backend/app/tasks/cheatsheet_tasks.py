@@ -1,10 +1,10 @@
 from app.celery_worker import celery_app
 from app.service.interview_cheatsheet import get_interview_cheatsheet
 from app.db.models import InterviewCheatSheetModel
-from app import SessionLocal
+from app.db.session import SessionLocal
 from loguru import logger
 import traceback
-from app import get_db_session
+from app.db.session import get_db_session
 
 
 @celery_app.task(name="generate_cheatsheet")
