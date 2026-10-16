@@ -62,10 +62,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             logger.warning("Non-access token supplied to protected endpoint")
             raise credentials_exception
 
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             logger.warning(f"JWT missing 'sub' | payload={payload}")
             raise credentials_exception
+        user_id = int(sub)
 
     except JWTError as e:
         logger.error(f"Token decode failed: {e}")
