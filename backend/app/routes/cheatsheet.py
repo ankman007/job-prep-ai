@@ -23,9 +23,7 @@ async def generate_cheatsheet(
         resume_text = extract_text_from_pdf(resume_pdf)
         pdf_filename = resume_pdf.filename
 
-        job_desc_word_count = len(job_description.split())
-        resume_word_count = len(resume_text.split())
-        validate_inputs(resume_word_count, job_desc_word_count)
+        validate_inputs(resume_text, job_description)
         
         task = generate_cheatsheet_task.delay(
             resume_text,
@@ -51,10 +49,16 @@ async def generate_cheatsheet(
     
 
 @router.get("/task-status/{task_id}")
-async def get_task_status(task_id: str):
+async def get_task_status(task_id: str, current_user = Depends(get_current_user)):
     result = AsyncResult(task_id, app=celery_app)
-    return {
-        "task_id": task_id,
-        "status": result.status,
-        "result": result.result if result.ready() else None
-    }
+    response = {"task_id": task_id, "status": result.status, "data": None, "error": None}
+
+    if result.successful():
+        data = result.result
+        if not isinstance(data, dict) or data.get("user_id") != current_user.id:
+            raise HTTPException(status_code=404, detail="Task not found.")
+        response["data"] = data
+    elif result.failed():
+        response["error"] = "Cheatsheet generation failed. Please try again."
+
+    return response
