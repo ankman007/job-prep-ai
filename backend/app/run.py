@@ -1,3 +1,4 @@
+from os import getenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.middleware import LoggingAndPerformanceMiddleware
@@ -9,6 +10,12 @@ from app.routes.health import router as health_router
 from app.db.models import UserModel, InterviewCheatSheetModel
 from app.db import init_db
 
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in getenv("CORS_ORIGINS", "http://localhost:3000,https://job-fit-ai.vercel.app").split(",")
+    if origin.strip()
+]
+
 def create_app():
     app = FastAPI() 
     init_db()
@@ -17,10 +24,7 @@ def create_app():
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "https://job-fit-ai.vercel.app"
-        ],
+        allow_origins=CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

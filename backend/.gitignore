@@ -38,3 +38,4 @@ venv/
 #pytest
 /test.db
 /.pytest_cache
+!.env.example
