@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 from fastapi import HTTPException
 from loguru import logger
 
