@@ -87,9 +87,16 @@ export function SkillsAssessment({ data }: SkillsAssessmentProps) {
     return Number.isInteger(num) ? num : num.toFixed(1);
   };
 
+  // Older cheatsheets store levels as 0-1, newer ones as 0-5
+  const levelScale = data.skillsByCategory.every((category) =>
+    category.skills.every((skill) => skill.level <= 1 && skill.required <= 1)
+  )
+    ? 5
+    : 1;
+
   const getLevelBar = (level: number, required: number, status: string) => {
     const maxLevel = 5;
-    const scaledLevel = Math.min(Math.round(level * 5), 5);
+    const scaledLevel = Math.min(Math.round(level * levelScale), 5);
     const bars = [];
 
     for (let i = 1; i <= maxLevel; i++) {
@@ -111,7 +118,7 @@ export function SkillsAssessment({ data }: SkillsAssessmentProps) {
       <div className="flex items-center">
         <div className="flex">{bars}</div>
         <div className="ml-2 text-xs text-gray-500">
-          {formatNumber((level * 5).toFixed(1))}/{formatNumber((required * 5).toFixed(1))} required
+          {formatNumber((level * levelScale).toFixed(1))}/{formatNumber((required * levelScale).toFixed(1))} required
         </div>
       </div>
     );

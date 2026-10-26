@@ -36,6 +36,21 @@ export function CheatsheetGenerator() {
       ? 0
       : jobDescription.trim().split(/\s+/).length;
 
+  const pollTask = async (taskId: string) => {
+    const deadline = Date.now() + 5 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const res = await fetch(`${apiBaseURL}/cheatsheet/task-status/${taskId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error("Failed to check cheatsheet status");
+      const status = await res.json();
+      if (status.status === "SUCCESS") return status.data;
+      if (status.status === "FAILURE") throw new Error(status.error);
+    }
+    throw new Error("Cheatsheet generation timed out. Please try again.");
+  };
+
   const handleRoleToggle = (role: "candidate" | "interviewer") => {
     setIsInterviewer(role === "interviewer");
     setCheatsheetType(role);
@@ -84,20 +99,27 @@ export function CheatsheetGenerator() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      if (!response.ok) throw new Error("Failed to generate cheatsheet");
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail || "Failed to generate cheatsheet");
+      }
 
-      const data = await response.json();
+      const { task_id } = await response.json();
+      const cheatsheet = await pollTask(task_id);
 
-      dispatch(addCheatsheet(data.data));
-      dispatch(setCurrentCheatsheet(data.data));
+      dispatch(addCheatsheet(cheatsheet));
+      dispatch(setCurrentCheatsheet(cheatsheet));
 
-      await new Promise((resolve) => setTimeout(resolve, 100)); 
-      router.push(`/results/${data.data.id}`);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      router.push(`/results/${cheatsheet.id}`);
     } catch (err) {
       console.error(err);
       toast({
         title: "Error",
-        description: "Something went wrong while generating the cheatsheet.",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong while generating the cheatsheet.",
         variant: "destructive",
       });
     } finally {

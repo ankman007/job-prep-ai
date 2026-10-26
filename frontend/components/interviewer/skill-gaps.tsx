@@ -101,7 +101,7 @@ export function SkillGaps({ data }: SkillGapsProps) {
             <div className="mb-6">
               <h3 className="text-lg font-medium text-red-600 mb-3 flex items-center">
                 <AlertTriangle className="h-5 w-5 mr-2" />
-                Critical Gaps
+                Minor Gaps
               </h3>
 
               <div className="space-y-4"></div>

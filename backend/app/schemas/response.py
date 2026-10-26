@@ -66,7 +66,9 @@ candidate_schema = {
       "properties": {
         "match_percentage": {
           "type": "number",
-          "description": "Overall skill match percentage"
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Overall skill match percentage from 0 to 100"
         },
         "matched_skills": {
           "type": "array",
@@ -218,12 +220,12 @@ interviewer_schema = {
     "compatibility_score": {
       "type": "object",
       "properties": {
-        "overall_score": {"type": "number"},
+        "overall_score": {"type": "number", "minimum": 0, "maximum": 100, "description": "Score from 0 to 100"},
         "match": {"type": "string", "enum": ["excellent", "good", "poor"]},
-        "technical_skills_score": {"type": "number"},
-        "education_score": {"type": "number"},
-        "experience_score": {"type": "number"},
-        "cultural_fit_score": {"type": "number"}
+        "technical_skills_score": {"type": "number", "minimum": 0, "maximum": 100, "description": "Score from 0 to 100"},
+        "education_score": {"type": "number", "minimum": 0, "maximum": 100, "description": "Score from 0 to 100"},
+        "experience_score": {"type": "number", "minimum": 0, "maximum": 100, "description": "Score from 0 to 100"},
+        "cultural_fit_score": {"type": "number", "minimum": 0, "maximum": 100, "description": "Score from 0 to 100"}
       },
       "required": ["overall_score", "match", "technical_skills_score", "education_score", "experience_score"]
 
@@ -246,8 +248,8 @@ interviewer_schema = {
                       "type": "object",
                       "properties": {
                         "name": { "type": "string" },
-                        "level": { "type": "number" },
-                        "required": { "type": "number" },
+                        "level": { "type": "number", "minimum": 0, "maximum": 5, "description": "Candidate proficiency from 0 to 5" },
+                        "required": { "type": "number", "minimum": 0, "maximum": 5, "description": "Proficiency the role requires, from 0 to 5" },
                         "status": {
                           "type": "string",
                           "enum": ["exceeds", "meets", "below", "missing"]
