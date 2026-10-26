@@ -1,0 +1,152 @@
+# Production stack for Dokploy (Compose application, "Compose Path": ./docker-compose.dokploy.yml).
+#
+# How it works:
+# - Images are built from the repository by Dokploy (no registry needed).
+# - Environment comes from Dokploy's Environment tab, which Dokploy writes to `.env`
+#   next to this file.
+# - No host ports: Dokploy's Traefik proxy owns 80/443. Attach the domain to the `nginx`
+#   service (container port 80) in the Domains tab; Traefik routes it over dokploy-network.
+# - One origin: nginx serves the Next.js app on / and the FastAPI backend on /api/
+#   (prefix stripped), so the frontend is built with NEXT_PUBLIC_API_BASE_URL=/api and
+#   needs no CORS or domain at build time.
+# - Data lives in named volumes (Dokploy cleans bind-mounted paths on redeploy).
+# See docs/DOKPLOY.md.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-backend: &backend
+  # Built once by the `backend` service; the worker reuses the same local image.
+  # (Building it in both services makes parallel builds race to write the same tag.)
+  image: job-prep-ai-backend:dokploy
+  pull_policy: never
+  env_file:
+    - .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?set POSTGRES_USER in the Environment tab}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the Environment tab}@db:5432/${POSTGRES_DB:?set POSTGRES_DB in the Environment tab}
+    REDIS_URL: redis://redis:6379/0
+    SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in the Environment tab}
+    ALGORITHM: ${ALGORITHM:-HS256}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY in the Environment tab}
+  restart: unless-stopped
+  logging: *logging
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  backend:
+    <<: *backend
+    build:
+      context: ./backend
+    pull_policy: build
+    # Trust X-Forwarded-* from nginx/Traefik so request URLs keep the https scheme.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # First start creates the database tables
+      start_period: 60s
+
+  worker:
+    <<: *backend
+    command: celery -A app.celery_worker.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-2}
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_worker.celery_app inspect ping --destination celery@$$HOSTNAME --timeout 10 > /dev/null"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+    image: job-prep-ai-frontend:dokploy
+    pull_policy: build
+    environment:
+      # Next's standalone server binds to $HOSTNAME, which Docker sets to the container id.
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    build:
+      context: deploy/nginx
+    image: job-prep-ai-nginx:dokploy
+    pull_policy: build
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      - default
+      - dokploy-network
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in the Environment tab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the Environment tab}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in the Environment tab}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  pgdata:
+    # Postgres sets the user's password only when this volume is first initialised;
+    # changing POSTGRES_PASSWORD later does NOT change the database ("password
+    # authentication failed"). Bumping DB_VOLUME_VERSION starts on a NEW, EMPTY database
+    # created with the current values. The old volume is kept, not deleted, but the app
+    # stops using it, so never bump it once there are real users: change the password in
+    # Postgres instead (see docs/DOKPLOY.md).
+    name: ${COMPOSE_PROJECT_NAME}_pgdata_${DB_VOLUME_VERSION:-1}
+  redis_data:

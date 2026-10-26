@@ -225,3 +225,8 @@ PostgreSQL
 Next.js
 Redux
 Docker
+
+Deployment
+
+Local: python start.py (Docker Compose on free ports).
+Production: Dokploy at https://job-prep-ai.ankit-poudel.com.np using docker-compose.dokploy.yml. See docs/DOKPLOY.md.
