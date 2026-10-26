@@ -35,7 +35,8 @@ export function CompatibilityScore({ data }: CompatibilityScoreProps) {
     return "Low Match"
   }
 
-  const formatScore = (score: number) => Math.round(score * 100)
+  // Older cheatsheets store scores as 0-1, newer ones as 0-100
+  const formatScore = (score: number) => Math.round(score <= 1 ? score * 100 : score)
 
   const categories = [
     { name: "Education", score: formatScore(data.education_score) },
